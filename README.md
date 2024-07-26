@@ -14,7 +14,7 @@ This repository is organized as follows:
 - `working_examples.ipynb` is a jupyter notebook that shows how to train the normalizing flows based on the simulated data and how to analyze the HMC chains
 - `\data` subdirectory contains pretrained normalizing flows, one example output of the HMC code and the parameters of the simulated spectra
 
-## How to run 
+## Execution
 
 In order to run the code provided in this repository follow the following steps: 
 
