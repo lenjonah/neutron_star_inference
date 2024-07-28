@@ -21,7 +21,7 @@ This repository is organized as follows:
 In order to run the code provided in this repository follow the following steps: 
 
 - install `requirements.txt`
-- download the telescope spectra `spectra_noisy.npy` (which are to large for github) from this link (https://tumde-my.sharepoint.com/:f:/g/personal/len_brandes_tum_de/EtNEvqZjljBApBDcoBC8C7EBgEnnlG-Y4SQX0X7j7XZDMg?e=tTRbo7)
+- download the telescope spectra `spectra_noisy.npy` (which are to large for github) from this link (https://tumde-my.sharepoint.com/:f:/g/personal/len_brandes_tum_de/Eghm3DM7mvZLuco4Cb76LzsBiwipLeBnIr9XZ2uRj6wi3g?e=Nnwb8E)
 - optional: take a look at `working_examples.ipynb` to understand the spectral data and the training of the normalizing flows
 - run `py NLE_spectra_HMC_xspec_mass.py OBS_IDX NUM_DENSITY_ESTIMATORS` to sample the posterior for a provided number of normalizing flows `NUM_DENSITY_ESTIMATORS` between 1 - 5 and an observation index `OBS_IDX` that specifies the spectra used as observations (between 0 and 148 for the test set)
 
