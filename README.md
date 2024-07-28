@@ -4,7 +4,7 @@ Neutron stars provide a unique window into the unknown physics of extremely dens
 
 In an approach called **neural likelihood estimation**, normalizing flows are trained on simulated data to approximate the analytically unavailable likelihood. Because normalizing flows are by design differentiable, this method allows the use of improved sampling methods, such as **Hamiltonian Monte Carlo**, which scale much better to higher-dimensional parameter spaces. The NLE + HMC approach outperforms previous methods and scales better to the growing number of observations expected in the coming years compared to the conventional two-step methods. More details can be found in our paper (https://arxiv.org/pdf/2403.00287). This repository contains the code used in our analysis to allow future studies to build on our progress.
 
-![alt text](https://github.com/lenjonah/neutron_star_inference/illustration.png)
+![alt text](https://github.com/lenjonah/neutron_star_inference/blob/main/illustration.png)
 
 ## Organization
 
