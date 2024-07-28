@@ -1,5 +1,5 @@
 '''
-Utils run Hamiltonian Monte Carlo to compute posterior samples based on telescope spectra  
+Utils to run Hamiltonian Monte Carlo to compute posterior samples based on telescope spectra  
 '''
 
 # import necessary packages, make sure to install requirements
@@ -17,14 +17,13 @@ from torch.distributions.utils import broadcast_all
 
 ########## Create prior ##########
 
-
 # read in simulated data 
 theta_spectra = np.load('./data/theta_spectra.npy', allow_pickle=True)
 theta_spectra = torch.tensor(theta_spectra, dtype=torch.float32)
 
 def create_truncated_prior(indices, std=[0.3, 0.05, 0.1]):
     '''
-    function to determine a truncated prior for the nuisance parameters and the EoS parameters 
+    determine a truncated prior for the nuisance parameters and the EoS parameters 
     
     :indices:   specify the observations, hence can be used to determine parameter values
     :std:       standard deviation for the three nuisance parameters [N_H, d, log(T_eff)], depend on scenario
@@ -36,25 +35,30 @@ def create_truncated_prior(indices, std=[0.3, 0.05, 0.1]):
     
     # truncated normal distributions for the three nuisance parameters of each observation specified by one index
     t_full = []
+
+    # loop over all observations, each star has their own individual nuisance parameters
     for idx in indices: 
+        # sample means for the priors
         t = torch.tensor([TruncatedNormal(torch.tensor([theta_spectra[idx][2]]), std[0] * torch.tensor([theta_spectra[idx][2]]), 0.01, 3.16).sample()[0],
             TruncatedNormal(torch.tensor([theta_spectra[idx][3]]), std[1] * torch.tensor([theta_spectra[idx][3]]), 2.3, 12.3).sample()[0],
             TruncatedNormal(torch.tensor([theta_spectra[idx][4]]), torch.tensor([std[2]]), 6, 6.3).sample()[0]
             ])
         [t_full.append(s) for s in t]
-        
+
+        # append to total distribution
         dist.append(TruncatedNormal(torch.tensor([t[0]]), std[0] * torch.tensor([theta_spectra[idx][2]]), 0.01, 3.16))
         dist.append(TruncatedNormal(torch.tensor([t[1]]), std[1] * torch.tensor([theta_spectra[idx][3]]), 2.3, 12.3))
         dist.append(TruncatedNormal(torch.tensor([t[2]]), torch.tensor([std[2]]), 6, 6.3))
 
     # create prior using sbi procedure
     prior, *_ = process_prior(dist)
+    
     return prior, torch.tensor(t_full)
     
 
 def create_prior(indices, t_full, std=[0.3, 0.05, 0.1]):
     '''
-    function to determine a prior for the nuisance parameters and the EoS parameters 
+    determine an untruncated prior for the nuisance parameters and the EoS parameters 
     
     :indices:   specify the observations, hence can be used to determine parameter values
     :std:       standard deviation for the three nuisance parameters [N_H, d, log(T_eff)], depend on scenario
@@ -65,6 +69,7 @@ def create_prior(indices, t_full, std=[0.3, 0.05, 0.1]):
         torch.distributions.Uniform(torch.tensor([-2.0476]), torch.tensor([-1.8531]))]
     
     # normal distributions for the three nuisance parameters of each observation specified by one index
+    # loop over all observations, each star has their own individual nuisance parameters
     for j, idx in enumerate(indices): 
         dist.append(torch.distributions.Normal(torch.tensor([t_full[3*j]]), std[0] * torch.tensor([theta_spectra[idx][2]])))
         dist.append(torch.distributions.Normal(torch.tensor([t_full[3*j+1]]), std[1] * torch.tensor([theta_spectra[idx][3]])))
@@ -78,10 +83,9 @@ def create_prior(indices, t_full, std=[0.3, 0.05, 0.1]):
     
 ########## Parameter transformations ########## 
 
-
 def para_transform(theta, scaler): 
     '''
-    parameter transform to scale all parameters to mean 0 and standard deviation 1
+    parameter transformation to scale all parameters to mean 0 and standard deviation 1
     
     :scaler:    pretrained standard scaler
     :return:    scaled parameters
@@ -90,7 +94,7 @@ def para_transform(theta, scaler):
     
 def para_inverse_transform(theta, scaler): 
     '''
-    inverse parameter transform to unscale parameters scaled to mean 0 and standard deviation 1
+    inverse parameter transformation to unscale parameters scaled to mean 0 and standard deviation 1
     
     :scaler:    pretrained standard scaler
     :return:    unscaled parameters
@@ -99,7 +103,7 @@ def para_inverse_transform(theta, scaler):
 
 def para_var(grad, scaler):
     '''
-    returns variance of a parameter transform
+    variance of a parameter transformation
     
     :scaler:    pretrained standard scaler
     :grad:      not necessary
@@ -110,7 +114,6 @@ def para_var(grad, scaler):
 
     
 ########## Observation model ########## 
-
 
 class obs_model_multi():
     '''    
@@ -154,7 +157,7 @@ class obs_model_multi():
         theta1[:,0] = 5.0
         theta1[:,1] = -1.95
         
-        # log probability of total prior for all observations for given theta
+        # log probability of the total prior for all observations for given parameters theta
         log_p = self.prior.log_prob(theta1).detach() * len(self.density_estimators)
 
         
@@ -166,7 +169,7 @@ class obs_model_multi():
         # log likelihood for given theta is given by the sum of all observations
         for i, o in enumerate(self.observation):
             
-            # create correct five dimensional parameter value corresponding to the particular observation
+            # create correct five dimensional parameter vector corresponding to the particular observation
             t = torch.cat([theta[:,:2], theta[:,i*3+2:i*3+5]], 1)
             
             # log likelihood for this particular observation computed using the density estimator
@@ -222,7 +225,7 @@ class obs_model_multi():
         # gradient of the log likelihood for given theta is given by the sum of all observations
         for i, o in enumerate(self.observation):
         
-            # create correct five dimensional parameter value corresponding to one particular observation
+            # create correct five dimensional parameter vector corresponding to one particular observation
             t = torch.cat([theta[:,:2], theta[:,i*3+2:i*3+5]], 1).numpy()
             
             # grad log likelihood for this particular observation computed using the density estimator  
@@ -252,8 +255,10 @@ class obs_model_multi():
 ########## HMC sampler ##########
 # taken from Chirag Modi https://github.com/modichirag/hmc
 
-
 class Sampler():
+    '''
+    create sampler object
+    '''
 
     def __init__(self):
         self.samples = []
@@ -284,6 +289,17 @@ class Sampler():
 
 
 class HMC():
+    '''
+    Sampler object to run on chain of HMC to determine posterior samples
+
+    :log_prob:            logarithm of the (unnormalized) posterior probability
+    :grad_log_prob:       gradient of the logarithm of the posterior probability
+    :log_prob_and_grad:   instead it is possible to provide both the logarithm of the posterior probability and its gradients
+    :invmetric_diag:      mass matrix used in HMC
+    :obs_idx:             index specifying the telescope spectra used as observations
+    :scaler:              pretrained standard scaler
+    :output_path:         path to store the (intermediate) results
+    '''
 
     def __init__(self, log_prob, grad_log_prob=None, log_prob_and_grad=None, invmetric_diag=None, obs_idx=None, scaler=None, output_path="./data/"):
 
@@ -309,6 +325,13 @@ class HMC():
  
    
     def V_g(self, x):
+        '''
+        gradient of the log posterior probability used as potential in the Hamiltonian
+
+        :x:         parameter value
+        :returns:   gradient of the log posterior probability 
+        '''
+        
         self.Vgcount += 1
         if self.grad_log_prob is not None:
             v_g = self.grad_log_prob(x)
@@ -318,6 +341,13 @@ class HMC():
 
         
     def V_vandg(self, x):
+        '''
+        log posterior probability and its gradient
+
+        :x:         parameter value
+        :returns:   log posterior probability and its gradient 
+        '''
+        
         if self.log_prob_and_grad is not None:
             self.Vgcount += 1
             v, v_g = self.log_prob_and_grad(x)
@@ -327,6 +357,13 @@ class HMC():
         
 
     def unit_norm_KE(self, p):
+        '''
+        kinetic term of the Hamiltonian
+
+        :p:        auxiliary momentum
+        :returns:  kinetic term of the Hamiltonian
+        '''
+        
         return 0.5 * (p**2).sum()
 
 
@@ -335,6 +372,15 @@ class HMC():
 
 
     def H(self, q, p, Vq=None):
+        '''
+        Hamiltonian
+
+        :q:        parameter value
+        :p:        auxiliary momentum
+        :Vq:       potential at q
+        :returns:  Hamiltonian, i.e., sum of potential and kinetic term
+        '''
+        
         if Vq is None: 
             self.Hcount += 1
             Vq = self.V(q)
@@ -342,6 +388,16 @@ class HMC():
 
 
     def leapfrog(self, q, p, N, step_size):
+        '''
+        leapfrog integrator to solve Hamiltonian dynamics
+
+        :q:            parameter value at step t
+        :p:            momentum value at step t
+        :N:            number of integration steps
+        :step_size:    step size of the integrator
+        :returns:      parameter value and momentum at step t + 1
+        '''
+        
         self.leapcount += 1 
         q0, p0 = q, p
         try:
@@ -359,6 +415,18 @@ class HMC():
 
 
     def leapfrog_Vgq(self, q, p, N, step_size, V_q=None, V_gq=None):
+        '''
+        leapfrog integrator to solve Hamiltonian dynamics which also returns the potential
+
+        :q:            parameter value at step t
+        :p:            momentum value at step t
+        :N:            number of integration steps
+        :step_size:    step size of the integrator
+        :V_q:          potential at q  
+        V_gq:          potential and its gradient at q
+        :returns:      parameter value, momentum and potential at step t + 1
+        '''
+        
         self.leapcount += 1 
         q0, p0, V_q0, V_gq0 = q, p, V_q, V_gq
         try:
@@ -384,6 +452,16 @@ class HMC():
 
 
     def metropolis(self, qp0, qp1, V_q0=None, V_q1=None, u=None):
+        '''
+        Metropolis-Hastings steps to check if proposed new state is accepted 
+
+        :qp0:          old parameter value and momentum
+        :qp1:          proposed parameter value and momentum
+        :V_q0:         potential at old parameter value 
+        :V_q1:         potential at proposed parameter value
+        :u:            random number to decide acceptance, usually left as None
+        :returns:      parameter value and momentum (proposed if accepted, or else old ones), 1 if accepted or else 0, Hamiltonians of old and proposed values  
+        '''
         
         q0, p0 = qp0
         q1, p1 = qp1
@@ -401,7 +479,15 @@ class HMC():
 
 
     def step(self, q, nleap, step_size, **kwargs):
+        '''
+        One step of full HMC algorithm: randomly sample momentum, integrate Hamiltonian dynamics, check acceptance
 
+        :q:            previous parameter value
+        :nleap:        number of leapfrog steps
+        :step_size:    step size of leapfrog integration
+        :returns:      parameter value and momentum (new if accepted, or else old), 1 if accepted or else 0, Hamiltonians of old and proposed values, number of function evaluations  
+        '''
+        
         self.leapcount, self.Vgcount, self.Hcount = 0, 0, 0
         p = np.random.multivariate_normal(np.zeros(q.size), self.invmetric_diag).reshape(q.shape) #np.random.normal(size=q.size).reshape(q.shape) * self.metricstd
         q1, p1 = self.leapfrog(q, p, nleap, step_size)
@@ -410,7 +496,13 @@ class HMC():
 
 
     def _parse_kwargs_sample(self, **kwargs):
-
+        '''
+        :nsamples:    length of the chain
+        :burnin:      number of burnin steps, i.e., steps done before running the chain which are dropped later
+        :step_size:   initial estimation for the stepsize 
+        :nleap:       number of leapfrog steps
+        '''
+        
         self.nsamples = kwargs['nsamples']
         self.burnin = kwargs['burnin']
         self.step_size = kwargs['step_size']
@@ -418,6 +510,14 @@ class HMC():
 
 
     def adapt_stepsize(self, q, epsadapt, **kwargs):
+        '''
+        Dynamically adapt stepsize using dual averaging
+
+        :q:            starting value
+        :epsadapt:     number of steps to adapt the stepsize
+        :returns:      parameter value after stepsize adaptation, which serves as an improved starting value
+        '''
+        
         #print("Adapting step size for %d iterations"%epsadapt)
         step_size = self.step_size
         epsadapt_kernel = DualAveragingStepSize(step_size)
@@ -441,7 +541,17 @@ class HMC():
 
     
     def sample(self, q, p=None, callback=None, skipburn=True, epsadapt=0, **kwargs):
+        '''
+        sample using HMC
 
+        :q:             starting value for the parameters
+        :p:             starting value for the momentum
+        :callback:      
+        :skipburn:      append samples to chain after burnin
+        :epsadapt:      number of stepsize adapation steps
+        :returns:       full HMC chain
+        '''
+        
         kw = kwargs
         self._parse_kwargs_sample(**kwargs)
         
@@ -468,8 +578,19 @@ class HMC():
         state.to_array()
         return state
     
-# dual averaging stepsize for dynamic stepsize determination
+
 class DualAveragingStepSize():
+    '''
+    Dual averaging stepsize for dynamic stepsize determination
+    
+    :initial_step_size:     starting step size
+    :target accept:         acceptance probability aimed for
+    :gamma:                 dual averaging parameter                 
+    :t0:                    dual averaging parameter
+    :kappa:                 dual averaging parameter
+    :nadapt:                number of steps
+    '''
+    
     def __init__(self, initial_step_size, target_accept=0.65, gamma=0.05, t0=10.0, kappa=0.75, nadapt=0):
         self.initial_step_size = initial_step_size 
         self.mu = np.log(10 * initial_step_size)  # proposals are biased upwards to stay away from 0.
@@ -482,7 +603,13 @@ class DualAveragingStepSize():
         self.nadapt = nadapt
         
     def update(self, p_accept):
+        '''
+        one step to update the average stepsize
 
+        :p_accept:    acceptance probability
+        :returns:     current stepsize, average stepsize
+        '''
+        
         if np.isnan(p_accept) : p_accept = 0.
         if p_accept > 1: p_accept = 1. 
         # Running tally of absolute error. Can be positive or negative. Want to be 0.
@@ -501,6 +628,14 @@ class DualAveragingStepSize():
 
     
     def __call__(self, i, p_accept):
+        '''
+        dynamically adapt step size
+
+        :i:            number of steps
+        :p_accept:     acceptance probability
+        :returns:      stepsize after adaptation
+        '''
+        
         if i == 0:
             return self.initial_step_size 
         elif i < self.nadapt:
@@ -525,10 +660,10 @@ CONST_LOG_SQRT_2PI_E = 0.5 * math.log(2 * math.pi * math.e)
 
 
 class TruncatedStandardNormal(Distribution):
-    """
+    '''
     Truncated Standard normal distribution
-    https://people.sc.fsu.edu/~jburkardt/presentations/truncated_normal.pdf
-    """
+    https://people.sc.fsu.edu/~jburkardt/presentations/truncated_normal.pdf 
+    '''
 
     arg_constraints = {
         'a': constraints.real,
@@ -615,10 +750,15 @@ class TruncatedStandardNormal(Distribution):
 
 
 class TruncatedNormal(TruncatedStandardNormal):
-    """
+    '''
     Truncated Normal distribution
     https://people.sc.fsu.edu/~jburkardt/presentations/truncated_normal.pdf
-    """
+    
+    :a:        lower limit truncation
+    :b:        upper limit truncation
+    :loc:      mean
+    :scale:    standard deviation
+    '''
 
     has_rsample = True
 
